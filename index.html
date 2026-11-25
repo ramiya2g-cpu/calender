@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="ko" class="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>도레이첨단소재 IT CL-5, 6 전용 4조3교대 달력</title>
+  
+  <!-- PWA / 모바일 앱 설정 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="교대근무달력">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
+  <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Firebase App (v8 Compat) & Realtime Database -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    * { 
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; 
+      word-break: keep-all; /* 단어 단위 줄바꿈 유지 */
+      overflow-wrap: break-word;
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* 모바일 가독성 향상 스타일 */
+    .keep-all { word-break: keep-all; }
+
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; color: black !important; padding: 0 !important; }
+      .print-container { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+      .calendar-cell { min-height: 130px !important; }
+      @page { size: A4 landscape; margin: 10mm; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 min-h-screen text-slate-800 dark:text-slate-100 antialiased pb-12 transition-colors duration-200">
+
+  <!-- Main Container -->
+  <div id="captureArea" class="max-w-[1600px] mx-auto px-2 sm:px-8 py-3 sm:py-6 print-container">
+
+    <!-- Header Section -->
+    <header class="bg-white dark:bg-slate-900 rounded-2xl shadow-md p-4 sm:p-6 mb-4 sm:mb-6 border border-slate-200 dark:border-slate-800 transition-colors duration-200">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-baseline gap-2 sm:gap-3">
+            <h1 class="text-xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              <i class="fa-solid fa-calendar-days text-blue-600 dark:text-blue-500"></i> 도레이첨단소재 IT CL-5, 6 전용
+            </h1>
+            <span class="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">by 조한솔</span>
+          </div>
+        </div>
+
+        <!-- Shift Times & Dark Mode Button -->
+        <div class="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-3 no-print">
+          <div class="hidden lg:flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300">
+            <span class="inline-flex items-center gap-1 text-blue-700 dark:text-blue-400"><i class="fa-solid fa-sun"></i> 오전 06~14시</span>
+            <span class="text-slate-300 dark:text-slate-600">|</span>
+            <span class="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400"><i class="fa-solid fa-cloud-sun"></i> 오후 14~22시</span>
+            <span class="text-slate-300 dark:text-slate-600">|</span>
+            <span class="inline-flex items-center gap-1 text-indigo-700 dark:text-indigo-400"><i class="fa-solid fa-moon"></i> 야간 22~06시</span>
+          </div>
+
+          <!-- 다크모드 전환 버튼 -->
+          <button onclick="toggleDarkMode()" id="darkModeBtn" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold transition flex items-center justify-center shadow-sm" title="다크모드 전환">
+            <i class="fa-solid fa-moon dark:hidden text-sm sm:text-base"></i>
+            <i class="fa-solid fa-sun hidden dark:inline text-sm sm:text-base"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation & Filter Bar -->
+      <div class="mt-4 sm:mt-6 pt-3 sm:pt-5 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 no-print">
+        <!-- Month Navigation -->
+        <div class="flex items-center justify-between sm:justify-start gap-2">
+          <button id="prevMonthBtn" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold transition flex items-center justify-center">
+            <i class="fa-solid fa-chevron-left text-xs sm:text-base"></i>
+          </button>
+          <h2 id="currentMonthLabel" class="text-xl sm:text-2xl font-black text-slate-800 dark:text-white min-w-[130px] sm:min-w-[150px] text-center">
+            2026년 10월
+          </h2>
+          <button id="nextMonthBtn" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold transition flex items-center justify-center">
+            <i class="fa-solid fa-chevron-right text-xs sm:text-base"></i>
+          </button>
+        </div>
+
+        <!-- 이번 달 선택 반 근무/야간/주간 통계 표시 영역 -->
+        <div id="monthStatsDisplay" style="display: none;" class="items-center justify-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-black text-slate-700 dark:text-slate-200 shadow-xs sm:mx-auto">
+          <!-- Dynamically Rendered -->
+        </div>
+
+        <!-- Group Filter Tabs & 휴가자 Button -->
+        <div class="flex items-center justify-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 sm:p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 w-full sm:w-auto flex-wrap">
+          <button onclick="setFilterGroup('LEAVE')" id="filter-LEAVE" class="group-tab px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm transition text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700">
+            휴가자
+          </button>
+          <div class="h-4 w-[1px] bg-slate-300 dark:bg-slate-700 mx-0.5"></div>
+          <span class="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 px-1 sm:px-2">반:</span>
+          <button onclick="setFilterGroup('ALL')" id="filter-ALL" class="group-tab px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-black text-xs sm:text-sm transition bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm">
+            전체
+          </button>
+          <button onclick="setFilterGroup('A')" id="filter-A" class="group-tab px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm transition text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700">
+            A반
+          </button>
+          <button onclick="setFilterGroup('B')" id="filter-B" class="group-tab px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm transition text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700">
+            B반
+          </button>
+          <button onclick="setFilterGroup('C')" id="filter-C" class="group-tab px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm transition text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700">
+            C반
+          </button>
+          <button onclick="setFilterGroup('D')" id="filter-D" class="group-tab px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl font-bold text-xs sm:text-sm transition text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700">
+            D반
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Layout Grid (Calendar + Right Mini Chat Panel) -->
+    <div class="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start">
+      
+      <!-- Calendar Table Container -->
+      <div class="flex-1 w-full bg-white dark:bg-slate-900 rounded-2xl shadow-md border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors duration-200">
+        <!-- Weekday Labels -->
+        <div class="grid grid-cols-7 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800 text-center font-black text-xs sm:text-sm py-2 sm:py-3 text-slate-700 dark:text-slate-300">
+          <div class="text-red-600 dark:text-red-400">일</div>
+          <div>월</div>
+          <div>화</div>
+          <div>수</div>
+          <div>목</div>
+          <div>금</div>
+          <div class="text-blue-600 dark:text-blue-400">토</div>
+        </div>
+
+        <!-- Calendar Days -->
+        <div id="calendarGrid" class="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-200 dark:divide-slate-800">
+          <!-- Generated Dynamically -->
+        </div>
+      </div>
+
+      <!-- Right Mini Chat Panel -->
+      <div class="w-full lg:w-[280px] shrink-0 bg-white dark:bg-slate-900 rounded-2xl shadow-md border border-slate-200 dark:border-slate-800 p-3.5 transition-colors duration-200 sticky top-6 flex flex-col h-[480px] sm:h-[650px] no-print">
+        <div class="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800 mb-2.5">
+          <div class="flex items-center gap-1.5">
+            <h3 class="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1">
+              <i class="fa-solid fa-comments text-blue-600 dark:text-blue-400"></i> 소통방
+            </h3>
+            <button onclick="openLoginModal()" id="loginBtnLabel" class="text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded-full hover:underline">
+              로그인
+            </button>
+            <span id="adminBadge" style="display: none;" class="text-[10px] font-black text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/60 px-1.5 py-0.5 rounded-md border border-red-200 dark:border-red-900">
+              관리자
+            </span>
+          </div>
+          
+          <div class="flex items-center gap-1">
+            <!-- 채팅 전체 삭제 버튼 (관리자 로그인 시에만 나타남) -->
+            <button onclick="executeResetChat()" id="adminResetBtn" style="display: none;" class="w-7 h-7 bg-red-50 dark:bg-red-950/60 hover:bg-red-100 text-red-600 dark:text-red-400 rounded-lg text-xs font-black transition items-center justify-center" title="채팅 전체 삭제">
+              <i class="fa-solid fa-rotate-right text-[11px]"></i>
+            </button>
+            <!-- 관리자 로그인 버튼 (자물쇠 아이콘) -->
+            <button onclick="handleAdminLoginBtnClick()" id="adminLoginBtn" class="w-7 h-7 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-black transition flex items-center justify-center" title="관리자 로그인">
+              <i class="fa-solid fa-user-shield text-[11px]"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Messages Box -->
+        <div id="miniChatContainer" class="flex-1 overflow-y-auto space-y-2 pr-1 text-xs no-scrollbar flex flex-col">
+          <div class="m-auto text-center text-slate-600 dark:text-slate-400 font-bold">
+            <i class="fa-solid fa-spinner animate-spin mb-1 block text-blue-500"></i> 연결 중...
+          </div>
+        </div>
+
+        <!-- Chat Input Bar -->
+        <div class="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex gap-1.5">
+          <input type="text" id="miniChatInput" placeholder="로그인 후 입력 가능..." onclick="checkLoginBeforeInput()" onfocus="checkLoginBeforeInput()" onkeypress="if(event.key==='Enter') sendMiniChat()"
+            class="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-xl px-3 py-2 text-xs font-medium outline-none text-slate-900 dark:text-white">
+          <button onclick="sendMiniChat()" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl font-black transition shadow-xs flex items-center justify-center">
+            <i class="fa-solid fa-paper-plane text-[10px]"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Login Modal (이름 입력 창) -->
+  <div id="loginModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-xs w-full p-6 border border-slate-200 dark:border-slate-800 space-y-4">
+      <div class="text-center">
+        <div class="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-2 text-xl font-black shadow-md">
+          <i class="fa-solid fa-user"></i>
+        </div>
+        <h3 class="text-base font-black text-slate-900 dark:text-white">소통방 대화명 설정</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">사용하실 이름을 입력해 주세요.</p>
+      </div>
+
+      <div>
+        <input type="text" id="loginNameInput" placeholder="이름 입력..." onkeypress="if(event.key==='Enter') saveLoginName()"
+          class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none text-slate-900 dark:text-white text-center">
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="closeLoginModal()" class="flex-1 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs">
+          취소
+        </button>
+        <button onclick="saveLoginName()" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs shadow-md">
+          확인
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Password Modal (관리자 비밀번호 입력 창) -->
+  <div id="adminModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-xs w-full p-6 border border-slate-200 dark:border-slate-800 space-y-4">
+      <div class="text-center">
+        <div class="w-12 h-12 bg-red-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-2 text-xl font-black shadow-md">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+        <h3 class="text-base font-black text-slate-900 dark:text-white">관리자 인증</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">관리자 비밀번호를 입력해 주세요.</p>
+      </div>
+      <div>
+        <input type="password" id="adminPasswordInput" placeholder="비밀번호 입력..." onkeypress="if(event.key==='Enter') verifyAdminPassword()"
+          class="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-bold outline-none text-slate-900 dark:text-white text-center">
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeAdminModal()" class="flex-1 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs">
+          취소
+        </button>
+        <button onclick="verifyAdminPassword()" class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl text-xs shadow-md">
+          확인
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day Detail / Memo Modal -->
+  <div id="dayModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden transform transition-all border border-slate-200 dark:border-slate-800">
+
+      <!-- Modal Header -->
+      <div class="bg-slate-900 dark:bg-slate-950 text-white p-5 sm:p-6 flex justify-between items-center border-b border-slate-800">
+        <div>
+          <h3 id="modalDateTitle" class="text-lg sm:text-xl font-black">2026년 10월 13일</h3>
+          <p id="modalSubTitle" class="text-xs text-slate-300 dark:text-slate-400 font-medium mt-0.5">반별 인원 및 근무/메모 설정</p>
+        </div>
+        <button onclick="closeModal()" class="w-8 h-8 sm:w-9 sm:h-9 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-full flex items-center justify-center font-bold transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Content -->
+      <div class="p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[75vh] overflow-y-auto">
+        <!-- Special Status Section -->
+        <div>
+          <h4 class="text-xs sm:text-sm font-black text-slate-800 dark:text-white mb-2 sm:mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-user-clock text-blue-600 dark:text-blue-400"></i> 반별 인원 선택 및 일정 지정
+          </h4>
+          <div class="space-y-2.5 sm:space-y-3" id="modalShiftList"></div>
+        </div>
+
+        <!-- 전체 메모 Section -->
+        <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+          <h4 class="text-xs sm:text-sm font-black text-slate-800 dark:text-white mb-2 sm:mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-note-sticky text-indigo-600 dark:text-indigo-400"></i> 전체 메모
+          </h4>
+          <div>
+            <input type="text" id="modalGeneralMemoInput" placeholder="달력에 표시될 전체 메모 입력..." 
+              class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 focus:border-blue-500 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-100 outline-none transition">
+          </div>
+        </div>
+
+        <!-- Memos Section -->
+        <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+          <h4 class="text-xs sm:text-sm font-black text-slate-800 dark:text-white mb-2 sm:mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-pen-to-square text-amber-600 dark:text-amber-400"></i> 반별 메모
+          </h4>
+          <div class="space-y-2.5 sm:space-y-3" id="modalMemoInputs"></div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="bg-slate-50 dark:bg-slate-950 p-3 sm:p-4 px-4 sm:px-6 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+        <button onclick="deleteDayData()" class="px-3 py-1.5 sm:px-4 sm:py-2 bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 hover:bg-red-100 font-bold rounded-xl text-xs sm:text-sm transition">
+          초기화
+        </button>
+        <div class="flex gap-2">
+          <button onclick="closeModal()" class="px-3 py-1.5 sm:px-4 sm:py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs sm:text-sm transition">
+            취소
+          </button>
+          <button onclick="saveModalData()" class="px-4 py-1.5 sm:px-5 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs sm:text-sm transition shadow-md shadow-blue-200 dark:shadow-none">
+            저장하기
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCUizcPj8AX7ExqX1jMjeVwnX0vQ_jbswk",
+      authDomain: "chat-f04e4.firebaseapp.com",
+      projectId: "chat-f04e4",
+      storageBucket: "chat-f04e4.firebasestorage.app",
+      messagingSenderId: "1039029961929",
+      appId: "1:1039029961929:web:176dde5fe9n3e0a54ff918",
+      measurementId: "G-5KCGZHJN21",
+      databaseURL: "https://chat-f04e4-default-rtdb.firebaseio.com"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const calendarRef = db.ref('shift_calendar');
+    const chatRef = db.ref('shift_chat');
+
+    let myName = '';
+    let isAdmin = false; 
+    let adminCallback = null;
+
+    updateLoginButtonLabel();
+
+    function handleAdminLoginBtnClick() {
+      if (isAdmin) {
+        if (confirm("관리자 로그아웃 하시겠습니까?")) {
+          isAdmin = false;
+          updateAdminUI();
+          renderMiniChat();
+        }
+      } else {
+        openAdminPasswordModal(() => {
+          isAdmin = true;
+          alert("관리자로 로그인되었습니다.");
+          updateAdminUI();
+          renderMiniChat();
+        });
+      }
+    }
+
+    function updateAdminUI() {
+      const resetBtn = document.getElementById('adminResetBtn');
+      const badge = document.getElementById('adminBadge');
+      const loginBtn = document.getElementById('adminLoginBtn');
+
+      if (isAdmin) {
+        resetBtn.style.display = 'flex';
+        badge.style.display = 'inline-block';
+        loginBtn.classList.remove('bg-blue-50', 'dark:bg-blue-950/60', 'text-blue-600', 'dark:text-blue-400');
+        loginBtn.classList.add('bg-red-500', 'text-white');
+      } else {
+        resetBtn.style.display = 'none';
+        badge.style.display = 'none';
+        loginBtn.classList.remove('bg-red-500', 'text-white');
+        loginBtn.classList.add('bg-blue-50', 'dark:bg-blue-950/60', 'text-blue-600', 'dark:text-blue-400');
+      }
+    }
+
+    function openAdminPasswordModal(callback) {
+      adminCallback = callback;
+      const pwdInput = document.getElementById('adminPasswordInput');
+      pwdInput.value = '';
+      document.getElementById('adminModal').classList.remove('hidden');
+      setTimeout(() => pwdInput.focus(), 100);
+    }
+
+    function closeAdminModal() {
+      document.getElementById('adminModal').classList.add('hidden');
+      adminCallback = null;
+    }
+
+    function verifyAdminPassword() {
+      const pwdInput = document.getElementById('adminPasswordInput');
+      const pwd = pwdInput.value.trim();
+
+      if (pwd === "rhksflwksla") {
+        const callback = adminCallback;
+        closeAdminModal();
+        if (callback) callback();
+      } else {
+        alert("비밀번호가 틀렸습니다. 다시 시도해 주세요.");
+        pwdInput.value = '';
+        pwdInput.focus();
+      }
+    }
+
+    function playDingDongSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(800, audioCtx.currentTime);
+        gain1.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        
+        osc1.start();
+        osc1.stop(audioCtx.currentTime + 0.3);
+
+        setTimeout(() => {
+          const osc2 = audioCtx.createOscillator();
+          const gain2 = audioCtx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(600, audioCtx.currentTime);
+          gain2.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+          
+          osc2.connect(gain2);
+          gain2.connect(audioCtx.destination);
+          
+          osc2.start();
+          osc2.stop(audioCtx.currentTime + 0.4);
+        }, 150);
+      } catch (e) {
+        console.log("오디오 재생 실패:", e);
+      }
+    }
+
+    function updateLoginButtonLabel() {
+      const btn = document.getElementById('loginBtnLabel');
+      const input = document.getElementById('miniChatInput');
+      if (myName) {
+        btn.textContent = `${myName}님`;
+        input.placeholder = "메시지를 입력하세요...";
+      } else {
+        btn.textContent = "로그인";
+        input.placeholder = "로그인 후 입력 가능...";
+      }
+    }
+
+    function checkLoginBeforeInput() {
+      if (!myName) {
+        document.getElementById('miniChatInput').blur();
+        openLoginModal();
+      }
+    }
+
+    function openLoginModal() {
+      document.getElementById('loginNameInput').value = myName;
+      document.getElementById('loginModal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('loginNameInput').focus(), 100);
+    }
+
+    function closeLoginModal() {
+      document.getElementById('loginModal').classList.add('hidden');
+    }
+
+    function saveLoginName() {
+      const val = document.getElementById('loginNameInput').value.trim();
+      if (!val) {
+        alert("이름을 입력해 주세요!");
+        return;
+      }
+      myName = val;
+      updateLoginButtonLabel();
+      closeLoginModal();
+      setTimeout(() => document.getElementById('miniChatInput').focus(), 100);
+    }
+
+    const REF_DATE = new Date(2026, 9, 13);
+    const REF_A_CYCLE_INDEX = 2;
+
+    const GROUP_MEMBERS = {
+      'A': ['영조', '한솔'],
+      'B': ['정재', '재범'],
+      'C': ['병문', '재흥'],
+      'D': ['영균', '승주']
+    };
+
+    const CYCLE_PATTERN = [
+      '오전', '오전', '오전', '오전', '오전',
+      '휴무', '휴무',
+      '야간', '야간', '야간', '야간', '야간',
+      '휴무',
+      '오후', '오후', '오후', '오후', '오후',
+      '휴무', '휴무'
+    ];
+
+    const GROUP_OFFSETS = { 'A': 0, 'B': 15, 'C': 10, 'D': 5 };
+
+    const HOLIDAYS = {
+      '2026-01-01': '신정',
+      '2026-02-16': '설날연휴',
+      '2026-02-17': '설날',
+      '2026-02-18': '설날연휴',
+      '2026-03-01': '3·1절',
+      '2026-03-02': '대체공휴일',
+      '2026-05-05': '어린이날',
+      '2026-05-24': '부처님오신날',
+      '2026-05-25': '대체공휴일',
+      '2026-06-06': '현충일',
+      '2026-08-15': '광복절',
+      '2026-08-17': '대체공휴일',
+      '2026-09-24': '추석연휴',
+      '2026-09-25': '추석',
+      '2026-09-26': '추석연휴',
+      '2026-10-03': '개천절',
+      '2026-10-05': '대체공휴일',
+      '2026-10-09': '한글날',
+      '2026-12-25': '크리스마스',
+
+      '2027-01-01': '신정',
+      '2027-02-06': '설날연휴',
+      '2027-02-07': '설날',
+      '2027-02-08': '설날연휴',
+      '2027-02-09': '대체공휴일',
+      '2027-03-01': '3·1절',
+      '2027-05-05': '어린이날',
+      '2027-05-13': '부처님오신날',
+      '2027-06-06': '현충일',
+      '2027-07-17': '제헌절',
+      '2027-07-19': '대체공휴일',
+      '2027-08-15': '광복절',
+      '2027-08-16': '대체공휴일',
+      '2027-09-14': '추석연휴',
+      '2027-09-15': '추석',
+      '2027-09-16': '추석연휴',
+      '2027-10-03': '개천절',
+      '2027-10-04': '대체공휴일',
+      '2027-10-09': '한글날',
+      '2027-10-11': '대체공휴일',
+      '2027-12-25': '크리스마스'
+    };
+
+    let currentDate = new Date();
+    let selectedFilterGroup = 'ALL';
+    let activeModalDateStr = null;
+    let sharedDatabase = {};
+    let chatMessages = [];
+    let isInitialChatLoad = true;
+
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        localStorage.setItem('TORAY_THEME', 'light');
+      } else {
+        html.classList.add('dark');
+        localStorage.setItem('TORAY_THEME', 'dark');
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedTheme = localStorage.getItem('TORAY_THEME');
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    });
+
+    calendarRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      sharedDatabase = data || {};
+      renderCalendar();
+    });
+
+    chatRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      let newMessages = [];
+      if (data) {
+        if (Array.isArray(data.messages)) {
+          newMessages = data.messages;
+        } else if (typeof data.messages === 'object') {
+          newMessages = Object.values(data.messages);
+        }
+      }
+      
+      if (!isInitialChatLoad && newMessages.length > chatMessages.length) {
+        const latestMsg = newMessages[newMessages.length - 1];
+        if (!myName || latestMsg.nick !== myName) {
+          playDingDongSound();
+        }
+      }
+
+      chatMessages = newMessages;
+      isInitialChatLoad = false;
+      renderMiniChat();
+    });
+
+    async function saveCloudData(data) {
+      sharedDatabase = data;
+      try {
+        await calendarRef.set(data);
+      } catch (e) {
+        console.error('달력 저장 실패:', e);
+      }
+    }
+
+    async function sendMiniChat() {
+      if (!myName) {
+        openLoginModal();
+        return;
+      }
+
+      const input = document.getElementById('miniChatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const now = new Date();
+      const nowMs = now.getTime();
+      const mStr = String(now.getMonth() + 1).padStart(2, '0');
+      const dStr = String(now.getDate()).padStart(2, '0');
+      const hStr = String(now.getHours()).padStart(2, '0');
+      const minStr = String(now.getMinutes()).padStart(2, '0');
+      const timeStr = `${mStr}/${dStr} ${hStr}:${minStr}`;
+
+      chatMessages.push({
+        id: String(nowMs),
+        timestamp: nowMs,
+        nick: myName,
+        text: text,
+        time: timeStr
+      });
+
+      if (chatMessages.length > 1000) {
+        chatMessages = chatMessages.slice(-1000);
+      }
+
+      input.value = '';
+      try {
+        await chatRef.set({ messages: chatMessages });
+      } catch (e) {
+        console.error('채팅 전송 실패:', e);
+      }
+    }
+
+    async function executeResetChat() {
+      if (!isAdmin) return;
+      if (confirm("정말로 소통방의 모든 대화 내용을 전체 삭제하시겠습니까?")) {
+        chatMessages = [];
+        try {
+          await chatRef.set({ messages: [] });
+          alert("소통방 전체 대화가 삭제되었습니다.");
+        } catch (e) {
+          console.error("초기화 실패:", e);
+          alert("삭제 중 오류가 발생했습니다.");
+        }
+      }
+    }
+
+    function handleDeleteMessage(msgId) {
+      const targetIdStr = String(msgId);
+
+      if (isAdmin) {
+        executeDeleteMessage(targetIdStr);
+        return;
+      }
+
+      const msg = chatMessages.find(m => String(m.id) === targetIdStr);
+      if (!msg) return;
+
+      const isMe = (myName && msg.nick === myName);
+      const msgTimestamp = Number(msg.timestamp || msg.id);
+      const isWithinHour = (Date.now() - msgTimestamp) < 3600000;
+
+      if (isMe && isWithinHour) {
+        executeDeleteMessage(targetIdStr);
+      } else {
+        openAdminPasswordModal(() => executeDeleteMessage(targetIdStr));
+      }
+    }
+
+    async function executeDeleteMessage(targetIdStr) {
+      chatMessages = chatMessages.filter(m => String(m.id) !== targetIdStr);
+      try {
+        await chatRef.set({ messages: chatMessages });
+      } catch (e) {
+        console.error("채팅 삭제 실패:", e);
+      }
+    }
+
+    function renderMiniChat() {
+      const container = document.getElementById('miniChatContainer');
+      if (chatMessages.length === 0) {
+        container.innerHTML = `<div class="m-auto text-center text-slate-600 dark:text-slate-400 font-bold">대화 내용이 없습니다.</div>`;
+        return;
+      }
+
+      let html = '';
+      chatMessages.forEach(msg => {
+        const isMe = (myName && msg.nick === myName);
+        const msgIdStr = String(msg.id);
+        const btnClass = isAdmin ? 'opacity-80 hover:opacity-100' : 'opacity-0 group-hover:opacity-100';
+
+        if (isMe) {
+          html += `
+            <div class="flex flex-col items-end mb-2 relative group">
+              <div class="flex items-center gap-1 mb-0.5">
+                <span class="text-[9px] text-slate-600 dark:text-slate-400">${msg.time}</span>
+                <span class="font-black text-blue-600 dark:text-blue-400">나 (${msg.nick})</span>
+              </div>
+              <div class="flex items-center gap-1 max-w-[88%]">
+                <button onclick="handleDeleteMessage('${msgIdStr}')" class="${btnClass} transition-opacity w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 hover:bg-red-500 hover:text-white text-slate-600 dark:text-slate-300 flex items-center justify-center text-[9px]" title="삭제">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+                <div class="bg-blue-600 text-white px-3 py-1.5 rounded-2xl rounded-tr-sm break-words font-medium shadow-xs">
+                  ${msg.text}
+                </div>
+              </div>
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="flex flex-col items-start mb-2 relative group">
+              <div class="flex items-center gap-1 mb-0.5">
+                <span class="font-black text-slate-700 dark:text-slate-300">${msg.nick}</span>
+                <span class="text-[9px] text-slate-600 dark:text-slate-400">${msg.time}</span>
+              </div>
+              <div class="flex items-center gap-1 max-w-[88%]">
+                <div class="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 px-3 py-1.5 rounded-2xl rounded-tl-sm break-words font-medium shadow-xs border border-black/5">
+                  ${msg.text}
+                </div>
+                <button onclick="handleDeleteMessage('${msgIdStr}')" class="${btnClass} transition-opacity w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 hover:bg-red-500 hover:text-white text-slate-600 dark:text-slate-300 flex items-center justify-center text-[9px]" title="삭제">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+            </div>
+          `;
+        }
+      });
+
+      container.innerHTML = html;
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function getCalculatedShift(dateObj, group) {
+      const d1 = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+      const d2 = new Date(REF_DATE.getFullYear(), REF_DATE.getMonth(), REF_DATE.getDate());
+      const diffDays = Math.round((d1 - d2) / (1000 * 60 * 60 * 24));
+
+      const offset = GROUP_OFFSETS[group];
+      let cycleIdx = (REF_A_CYCLE_INDEX + diffDays + offset) % 20;
+      if (cycleIdx < 0) cycleIdx += 20;
+
+      return CYCLE_PATTERN[cycleIdx];
+    }
+
+    function getDayDataForDate(dateStr) {
+      return sharedDatabase[dateStr] || { memberStatuses: {}, shifts: {}, memos: {}, generalMemo: '' };
+    }
+
+    function formatDateStr(year, month, day) {
+      const m = String(month + 1).padStart(2, '0');
+      const d = String(day).padStart(2, '0');
+      return `${year}-${m}-${d}`;
+    }
+
+    function setFilterGroup(group) {
+      selectedFilterGroup = group;
+      document.querySelectorAll('.group-tab').forEach(btn => {
+        btn.classList.remove('bg-white', 'dark:bg-slate-900', 'text-slate-900', 'dark:text-white', 'shadow-sm', 'font-black');
+        btn.classList.add('text-slate-600', 'dark:text-slate-400', 'font-bold');
+      });
+
+      const activeBtn = document.getElementById(`filter-${group}`);
+      if (activeBtn) {
+        activeBtn.classList.add('bg-white', 'dark:bg-slate-900', 'text-slate-900', 'dark:text-white', 'shadow-sm', 'font-black');
+        activeBtn.classList.remove('text-slate-600', 'dark:text-slate-400');
+      }
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      document.getElementById('currentMonthLabel').textContent = `${year}년 ${month + 1}월`;
+
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+
+      const startDayOfWeek = firstDay.getDay();
+      const totalDays = lastDay.getDate();
+
+      let workCount = 0;
+      let nightCount = 0;
+      const statsDisplay = document.getElementById('monthStatsDisplay');
+
+      if (selectedFilterGroup !== 'ALL' && selectedFilterGroup !== 'LEAVE') {
+        for (let d = 1; d <= totalDays; d++) {
+          const dObj = new Date(year, month, d);
+          const dStr = formatDateStr(year, month, d);
+          const dData = sharedDatabase[dStr] || { memberStatuses: {}, shifts: {}, memos: {}, generalMemo: '' };
+          const base = getCalculatedShift(dObj, selectedFilterGroup);
+
+          const custom = dData.shifts && dData.shifts[selectedFilterGroup] ? dData.shifts[selectedFilterGroup] : 'NONE';
+          const isOffDay = (custom === '휴무') || (base === '휴무' && custom === 'NONE');
+
+          if (!isOffDay) {
+            workCount++;
+            if (base === '야간') {
+              nightCount++;
+            }
+          }
+        }
+
+        const dayShiftCount = workCount - nightCount;
+
+        statsDisplay.innerHTML = `
+          <span class="text-blue-600 dark:text-blue-400">${selectedFilterGroup}반</span> 
+          <span>근무일수 <strong class="text-slate-900 dark:text-white">${workCount}일 (${workCount * 8}시간)</strong></span>
+          <span class="text-slate-300 dark:text-slate-600">·</span>
+          <span>주간일수 <strong class="text-slate-900 dark:text-white">${dayShiftCount}일 (${dayShiftCount * 8}시간)</strong></span>
+          <span class="text-slate-300 dark:text-slate-600">·</span>
+          <span>야간일수 <strong class="text-slate-900 dark:text-white">${nightCount}일 (${nightCount * 8}시간)</strong></span>
+        `;
+        statsDisplay.style.display = 'flex';
+      } else if (selectedFilterGroup === 'LEAVE') {
+        let leaveDaysCount = 0;
+        for (let d = 1; d <= totalDays; d++) {
+          const dObj = new Date(year, month, d);
+          const dStr = formatDateStr(year, month, d);
+          const dData = sharedDatabase[dStr] || { memberStatuses: {}, shifts: {}, memos: {}, generalMemo: '' };
+          let hasAny = false;
+          ['A', 'B', 'C', 'D'].forEach(grp => {
+            const custom = (dData.shifts && dData.shifts[grp]) ? dData.shifts[grp] : 'NONE';
+            const memos = (dData.memos && dData.memos[grp]) ? dData.memos[grp] : '';
+            const mStat = (dData.memberStatuses && dData.memberStatuses[grp]) ? dData.memberStatuses[grp] : {};
+            if (custom !== 'NONE' || Object.keys(mStat).length > 0 || (memos && memos.trim() !== '')) {
+              hasAny = true;
+            }
+          });
+          if (hasAny) leaveDaysCount++;
+        }
+        statsDisplay.innerHTML = `
+          <span class="text-emerald-600 dark:text-emerald-400">휴가자 모드</span> 
+          <span>등록된 변경일 <strong class="text-slate-900 dark:text-white">${leaveDaysCount}일</strong></span>
+        `;
+        statsDisplay.style.display = 'flex';
+      } else {
+        statsDisplay.style.display = 'none';
+      }
+
+      const grid = document.getElementById('calendarGrid');
+      grid.innerHTML = '';
+
+      const now = new Date();
+      const todayStr = formatDateStr(now.getFullYear(), now.getMonth(), now.getDate());
+
+      const prevMonthLastDay = new Date(year, month, 0).getDate();
+      for (let i = startDayOfWeek - 1; i >= 0; i--) {
+        const dayNum = prevMonthLastDay - i;
+        const cell = document.createElement('div');
+        cell.className = 'bg-slate-50/60 dark:bg-slate-950/40 p-1 sm:p-2 min-h-[90px] sm:min-h-[140px] opacity-30 select-none border-b border-slate-200 dark:border-slate-800';
+        cell.innerHTML = `<span class="text-xs sm:text-sm font-semibold text-slate-400">${dayNum}</span>`;
+        grid.appendChild(cell);
+      }
+
+      for (let day = 1; day <= totalDays; day++) {
+        const dateObj = new Date(year, month, day);
+        const dateStr = formatDateStr(year, month, day);
+        const dayOfWeek = dateObj.getDay();
+
+        const isToday = (dateStr === todayStr);
+        const holidayName = HOLIDAYS[dateStr];
+        const dayData = sharedDatabase[dateStr] || { memberStatuses: {}, shifts: {}, memos: {}, generalMemo: '' };
+        const generalMemo = dayData.generalMemo ? dayData.generalMemo.trim() : '';
+
+        const cell = document.createElement('div');
+        cell.onclick = () => openModal(dateStr, dateObj);
+
+        let cellClasses = 'calendar-cell p-1 sm:p-2.5 min-h-[95px] sm:min-h-[140px] bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800/80 cursor-pointer flex flex-col justify-between border-b border-slate-200 dark:border-slate-800 relative group ';
+        if (isToday) {
+          cellClasses += 'border-2 sm:border-4 border-blue-600 z-10 shadow-md ring-1 sm:ring-2 ring-blue-300 ';
+        }
+        cell.className = cellClasses;
+
+        let dayColorClass = 'text-slate-800 dark:text-slate-100';
+        if (dayOfWeek === 0 || holidayName) dayColorClass = 'text-red-600 dark:text-red-400';
+        if (dayOfWeek === 6 && !holidayName) dayColorClass = 'text-blue-600 dark:text-blue-400';
+
+        let cellHTML = `
+          <div class="flex justify-between items-center mb-1 sm:mb-1.5">
+            <div class="flex items-center gap-1 flex-wrap">
+              <span class="text-xs sm:text-base font-black ${dayColorClass} ${isToday ? 'bg-blue-600 text-white w-5 h-5 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[11px] sm:text-sm shadow-sm' : ''}">
+                ${day}
+              </span>
+              ${holidayName ? `<span class="text-[9px] sm:text-[11px] font-black text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950/60 px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded border border-red-100 dark:border-red-900/50 truncate max-w-[45px] sm:max-w-none">${holidayName}</span>` : ''}
+              ${generalMemo ? `<span class="text-[9px] sm:text-[11px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded border border-indigo-100 dark:border-indigo-900/50 truncate max-w-[45px] sm:max-w-none">${generalMemo}</span>` : ''}
+            </div>
+          </div>
+          <div class="space-y-1 sm:space-y-1.5 flex-1 flex flex-col justify-center">
+        `;
+
+        ['A', 'B', 'C', 'D'].forEach(grp => {
+          const baseShift = getCalculatedShift(dateObj, grp);
+          const customStatus = (dayData.shifts && dayData.shifts[grp]) ? dayData.shifts[grp] : 'NONE';
+          const memoText = (dayData.memos && dayData.memos[grp]) ? dayData.memos[grp] : '';
+          const memberStatuses = (dayData.memberStatuses && dayData.memberStatuses[grp]) ? dayData.memberStatuses[grp] : {};
+
+          let memberStrs = [];
+          GROUP_MEMBERS[grp].forEach(memberName => {
+            if (memberStatuses[memberName]) {
+              memberStrs.push(`${memberName} ${memberStatuses[memberName]}`);
+            }
+          });
+
+          const hasCustomOrMemo = (customStatus !== 'NONE') || (memberStrs.length > 0) || (memoText && memoText.trim() !== '');
+
+          // Filter logic
+          if (selectedFilterGroup === 'LEAVE') {
+            if (!hasCustomOrMemo) return; // 휴가자 모드일 때는 변경사항/초록색 항목이 없으면 표시하지 않음
+          } else if (selectedFilterGroup !== 'ALL') {
+            if (selectedFilterGroup !== grp) return;
+          }
+
+          let displayLabel = `${grp}반 ${baseShift}`;
+          if (memberStrs.length > 0) {
+            displayLabel += ` / ${memberStrs.join(', ')}`;
+          }
+          if (customStatus !== 'NONE') {
+            displayLabel += ` (${customStatus})`;
+          }
+          if (memoText && memoText.trim() !== '') {
+            displayLabel += ` [${memoText.trim()}]`;
+          }
+
+          let shiftStyle = '';
+          if (hasCustomOrMemo) {
+            shiftStyle = 'border sm:border-2 border-emerald-500 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-950 dark:text-emerald-200 font-black shadow-xs';
+          } else {
+            if (baseShift === '휴무') {
+              shiftStyle = 'border border-pink-200 dark:border-pink-900/50 bg-pink-50 dark:bg-pink-950/40 text-pink-700 dark:text-pink-300 font-extrabold';
+            } else if (baseShift === '오전') {
+              shiftStyle = 'border border-blue-200 dark:border-blue-900/50 bg-blue-100 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 font-extrabold';
+            } else if (baseShift === '오후') {
+              shiftStyle = 'border border-amber-200 dark:border-amber-900/50 bg-amber-100 dark:bg-amber-950/50 text-amber-900 dark:text-amber-200 font-extrabold';
+            } else if (baseShift === '야간') {
+              shiftStyle = 'border border-indigo-200 dark:border-indigo-900/50 bg-indigo-100 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 font-extrabold';
+            }
+          }
+
+          cellHTML += `
+            <div class="flex items-center justify-center px-1 sm:px-2 py-0.5 sm:py-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-bold ${shiftStyle} transition-all text-center leading-tight keep-all overflow-hidden">
+              <span class="tracking-tighter sm:tracking-tight whitespace-normal break-keep">${displayLabel}</span>
+            </div>
+          `;
+        });
+
+        cellHTML += `</div>`;
+        cell.innerHTML = cellHTML;
+        grid.appendChild(cell);
+      }
+
+      const totalRenderedCells = startDayOfWeek + totalDays;
+      const remainingCells = (7 - (totalRenderedCells % 7)) % 7;
+      for (let i = 1; i <= remainingCells; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'bg-slate-50/60 dark:bg-slate-950/40 p-1 sm:p-2 min-h-[90px] sm:min-h-[140px] opacity-30 select-none border-b border-slate-200 dark:border-slate-800';
+        cell.innerHTML = `<span class="text-xs sm:text-sm font-semibold text-slate-400">${i}</span>`;
+        grid.appendChild(cell);
+      }
+    }
+
+    function openModal(dateStr, dateObj) {
+      activeModalDateStr = dateStr;
+      const [y, m, d] = dateStr.split('-').map(Number);
+      document.getElementById('modalDateTitle').textContent = `${y}년 ${m}월 ${d}일 일정 및 인원 지정`;
+
+      const dayData = getDayDataForDate(dateStr);
+
+      const modalShiftList = document.getElementById('modalShiftList');
+      modalShiftList.innerHTML = '';
+
+      ['A', 'B', 'C', 'D'].forEach(grp => {
+        const memberStatuses = dayData.memberStatuses && dayData.memberStatuses[grp] ? dayData.memberStatuses[grp] : {};
+        const members = GROUP_MEMBERS[grp];
+
+        const row = document.createElement('div');
+        row.className = 'bg-slate-50 dark:bg-slate-800/60 p-2.5 sm:p-3 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3';
+        
+        let membersHTML = '';
+        members.forEach(name => {
+          const currentNameStatus = memberStatuses[name] || 'NONE';
+          membersHTML += `
+            <div class="flex items-center gap-1 flex-1 w-full sm:w-auto">
+              <span class="text-xs font-black text-slate-800 dark:text-slate-200 shrink-0 min-w-[28px]">${name}</span>
+              <select id="member-status-${grp}-${name}" class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-1.5 py-1 font-bold text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none flex-1">
+                <option value="NONE" ${currentNameStatus === 'NONE' ? 'selected' : ''}>선택안함</option>
+                <option value="연차" ${currentNameStatus === '연차' ? 'selected' : ''}>🌴 연차</option>
+                <option value="휴가" ${currentNameStatus === '휴가' ? 'selected' : ''}>🏖️ 휴가</option>
+                <option value="근속" ${currentNameStatus === '근속' ? 'selected' : ''}>🎁 근속</option>
+                <option value="경사" ${currentNameStatus === '경사' ? 'selected' : ''}>🎉 경사</option>
+                <option value="조사" ${currentNameStatus === '조사' ? 'selected' : ''}>🖤 조사</option>
+                <option value="휴무" ${currentNameStatus === '휴무' ? 'selected' : ''}>💤 휴무</option>
+                <option value="공가" ${currentNameStatus === '공가' ? 'selected' : ''}>🏛️ 공가</option>
+                <option value="교육" ${currentNameStatus === '교육' ? 'selected' : ''}>✏️ 교육</option>
+                <option value="부화합회의" ${currentNameStatus === '부화합회의' ? 'selected' : ''}>🤝 부화합회의</option>
+                <option value="3S" ${currentNameStatus === '3S' ? 'selected' : ''}>✨ 3S</option>
+                <option value="안전교육" ${currentNameStatus === '안전교육' ? 'selected' : ''}>🦺 안전교육</option>
+              </select>
+            </div>
+          `;
+        });
+
+        row.innerHTML = `
+          <div class="flex items-center gap-2 w-full sm:w-auto justify-start">
+            <span class="font-black text-slate-800 dark:text-white text-xs sm:text-sm px-2 py-0.5 sm:px-2.5 sm:py-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 min-w-[45px] text-center">${grp}반</span>
+          </div>
+          <div class="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto flex-1 justify-end">
+            ${membersHTML}
+          </div>
+        `;
+        modalShiftList.appendChild(row);
+      });
+
+      document.getElementById('modalGeneralMemoInput').value = dayData.generalMemo || '';
+
+      const modalMemoInputs = document.getElementById('modalMemoInputs');
+      modalMemoInputs.innerHTML = '';
+
+      ['A', 'B', 'C', 'D'].forEach(grp => {
+        const memoVal = (dayData.memos && dayData.memos[grp]) ? dayData.memos[grp] : '';
+
+        const memoBox = document.createElement('div');
+        memoBox.className = 'flex items-center gap-2';
+        memoBox.innerHTML = `
+          <span class="w-12 sm:w-14 text-xs font-black text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 py-1.5 sm:py-2 rounded-xl text-center shrink-0">${grp}반</span>
+          <input type="text" id="memo-input-${grp}" value="${memoVal}" placeholder="메모 입력..." 
+            class="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 focus:border-blue-500 rounded-xl px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-100 outline-none transition">
+        `;
+        modalMemoInputs.appendChild(memoBox);
+      });
+
+      document.getElementById('dayModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('dayModal').classList.add('hidden');
+      activeModalDateStr = null;
+    }
+
+    async function saveModalData() {
+      if (!activeModalDateStr) return;
+
+      if (!sharedDatabase[activeModalDateStr]) {
+        sharedDatabase[activeModalDateStr] = { memberStatuses: {}, shifts: {}, memos: {}, generalMemo: '' };
+      }
+      if (!sharedDatabase[activeModalDateStr].memberStatuses) {
+        sharedDatabase[activeModalDateStr].memberStatuses = {};
+      }
+      if (!sharedDatabase[activeModalDateStr].memos) {
+        sharedDatabase[activeModalDateStr].memos = {};
+      }
+
+      const generalMemoInp = document.getElementById('modalGeneralMemoInput').value;
+      sharedDatabase[activeModalDateStr].generalMemo = generalMemoInp;
+
+      ['A', 'B', 'C', 'D'].forEach(grp => {
+        const memoInp = document.getElementById(`memo-input-${grp}`).value;
+        sharedDatabase[activeModalDateStr].memos[grp] = memoInp;
+
+        if (!sharedDatabase[activeModalDateStr].memberStatuses[grp]) {
+          sharedDatabase[activeModalDateStr].memberStatuses[grp] = {};
+        }
+
+        GROUP_MEMBERS[grp].forEach(name => {
+          const mStatus = document.getElementById(`member-status-${grp}-${name}`).value;
+          if (mStatus !== 'NONE') {
+            sharedDatabase[activeModalDateStr].memberStatuses[grp][name] = mStatus;
+          } else {
+            delete sharedDatabase[activeModalDateStr].memberStatuses[grp][name];
+          }
+        });
+      });
+
+      await saveCloudData(sharedDatabase);
+      closeModal();
+    }
+
+    async function deleteDayData() {
+      if (!activeModalDateStr) return;
+      delete sharedDatabase[activeModalDateStr];
+      await saveCloudData(sharedDatabase);
+      closeModal();
+    }
+
+    document.getElementById('prevMonthBtn').onclick = () => {
+      currentDate.setMonth(currentDate.getMonth() - 1);
+      renderCalendar();
+    };
+
+    document.getElementById('nextMonthBtn').onclick = () => {
+      currentDate.setMonth(currentDate.getMonth() + 1);
+      renderCalendar();
+    };
+  </script>
+</body>
+</html>
